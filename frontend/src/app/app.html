@@ -1,0 +1,93 @@
+
+<div class="dashboard">
+  <header class="header">
+    <div>
+      <p class="eyebrow">SANJIVANI SUGAR FACTORY</p>
+      <h1>Farmer Management</h1>
+      <p class="subtitle">Sugarcane supply and payment overview</p>
+    </div>
+    <span class="status">AI Powered</span>
+  </header>
+
+  <section class="stats">
+    <div class="stat-card">
+      <p>Total Farmers</p>
+      <h2>{{ farmers.length }}</h2>
+    </div>
+
+    <div class="stat-card">
+      <p>Sugarcane Supplied</p>
+      <h2>{{ totalTons | number:'1.2-2' }} <small>tons</small></h2>
+    </div>
+
+    <div class="stat-card">
+      <p>Pending Payments</p>
+      <h2>{{ totalPending | currency:'INR':'symbol':'1.0-0' }}</h2>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Ask your Farmer AI Assistant</h2>
+    <p>Ask questions about sugarcane supply and farmer payments.</p>
+
+    <form (ngSubmit)="askQuestion()">
+      <textarea
+        name="question"
+        [(ngModel)]="question"
+        placeholder="Ask a question about farmers..."
+        rows="3"
+        required>
+      </textarea>
+
+      <button type="submit" [disabled]="loading">
+        {{ loading ? 'Thinking...' : 'Ask AI' }}
+      </button>
+    </form>
+
+    <div class="answer" *ngIf="answer">
+      <strong>AI Answer</strong>
+      <p>{{ answer }}</p>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="table-heading">
+      <div>
+        <h2>Farmer Records</h2>
+        <p>Information retrieved from PostgreSQL through MCP</p>
+      </div>
+      <button class="refresh" (click)="loadFarmers()">Refresh</button>
+    </div>
+
+    <p class="error" *ngIf="error">{{ error }}</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Farmer</th>
+            <th>Village</th>
+            <th>Supply (tons)</th>
+            <th>Amount Paid</th>
+            <th>Payment Pending</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let farmer of farmers">
+            <td>{{ farmer.name }}</td>
+            <td>{{ farmer.village }}</td>
+            <td>{{ farmer.sugarcane_tons }}</td>
+            <td>{{ farmer.amount_paid | currency:'INR':'symbol':'1.0-0' }}</td>
+            <td class="pending">
+              {{ farmer.payment_pending | currency:'INR':'symbol':'1.0-0' }}
+            </td>
+          </tr>
+
+          <tr *ngIf="farmers.length === 0">
+            <td colspan="5">No farmer records available.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
