@@ -1,13 +1,17 @@
 
 import "dotenv/config";
-import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 import express from "express";
 import cors from "cors";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+if (!process.env.GEMINI_API_KEY) {
+  throw new Error("GEMINI_API_KEY is missing from the .env file");
+}
+
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
 });
 
 const mcp = new Client({
@@ -57,7 +61,7 @@ async function getFarmers(question: string) {
   };
 }
 
-// Endpoint 1: Get farmers from PostgreSQL through MCP.
+// Endpoint 1: Get farmer records.
 app.get("/api/farmers", async (_req, res) => {
   try {
     const data = await getFarmers("Return all farmer records");
@@ -68,7 +72,7 @@ app.get("/api/farmers", async (_req, res) => {
   }
 });
 
-// Endpoint 2: Ask an AI question about farmers.
+// Endpoint 2: Ask Gemini about farmer records.
 app.post("/api/ask", async (req, res) => {
   try {
     const question = req.body?.question;
@@ -78,63 +82,32 @@ app.post("/api/ask", async (req, res) => {
       return;
     }
 
-    const { tools } = await mcp.listTools();
+    // Fetch real data from PostgreSQL through MCP.
+    const data = await getFarmers(question);
 
-    const response = await openai.responses.create({
-      model: "gpt-4.1-mini",
-      input: question,
-      tools: tools.map(tool => ({
-        type: "function" as const,
-        name: tool.name,
-        description: tool.description ?? "",
-        parameters: tool.inputSchema,
-        strict: false,
-      })),
-      tool_choice: "required",
+    // Give Gemini the database results to answer from.
+    const response = await ai.models.generateContent({
+     model: "gemini-3.8-flash",
+      contents: `
+You are an assistant for Sanjivani Sugar Factory.
+Answer the user's question using only the farmer data below.
+Do not invent farmer details or amounts.
+If the answer is not available in the data, say so.
+Format your answer clearly.
+
+Farmer data:
+${JSON.stringify(data.farmers, null, 2)}
+
+User question:
+${question}
+`,
     });
 
-    const outputs = [];
-
-    for (const item of response.output) {
-      if (item.type !== "function_call") continue;
-
-      const result = await mcp.callTool({
-        name: item.name,
-        arguments: JSON.parse(item.arguments),
-      });
-
-      if (result.isError) {
-        throw new Error(JSON.stringify(result.content));
-      }
-
-      const content = result.content as Array<{
-        type: string;
-        text?: string;
-      }>;
-
-      outputs.push({
-        type: "function_call_output" as const,
-        call_id: item.call_id,
-        output: content
-          .filter(part => part.type === "text")
-          .map(part => part.text ?? "")
-          .join("\n"),
-      });
-    }
-
-    if (outputs.length === 0) {
-      throw new Error("OpenAI did not request the farmer tool");
-    }
-
-    const answer = await openai.responses.create({
-      model: "gpt-4.1-mini",
-      previous_response_id: response.id,
-      input: outputs,
+    res.json({
+      answer: response.text ?? "No answer was generated.",
     });
-
-    res.json({ answer: answer.output_text });
   } catch (error) {
-    console.error("AI API error:", error);
+    console.error("Gemini API error:", error);
     res.status(500).json({
       error: "Could not answer the question. Check the backend terminal.",
     });
