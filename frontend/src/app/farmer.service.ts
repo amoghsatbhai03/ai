@@ -15,8 +15,7 @@ export interface Farmer {
   providedIn: 'root'
 })
 export class FarmerService {
-  private api = 'http://localhost:3000/api';
-
+  private api = 'https://sanjivani-ai-backend.onrender.com/api';
   constructor(private http: HttpClient) {}
 
   getFarmers(): Observable<Farmer[]> {
