@@ -5,12 +5,22 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { Pool } from "pg";
 import { z } from "zod";
 
+// Safe diagnostic: never print the database password
+console.error("Database configuration check:", {
+  PGHOST: process.env.PGHOST || "MISSING",
+  PGPORT: process.env.PGPORT || "MISSING",
+  PGDATABASE: process.env.PGDATABASE || "MISSING",
+  PGUSER: process.env.PGUSER || "MISSING",
+  PGPASSWORD: process.env.PGPASSWORD ? "SET" : "MISSING",
+});
+
 const db = new Pool({
   host: process.env.PGHOST,
   port: Number(process.env.PGPORT || 5432),
   database: process.env.PGDATABASE,
   user: process.env.PGUSER,
   password: process.env.PGPASSWORD,
+  connectionTimeoutMillis: 10000,
 });
 
 const server = new McpServer({
@@ -52,7 +62,7 @@ server.registerTool(
       const message =
         error instanceof Error ? error.message : String(error);
 
-      console.error("PostgreSQL error:", message);
+      console.error("PostgreSQL query error:", message);
 
       return {
         isError: true,
