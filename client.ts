@@ -7,11 +7,19 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 if (!process.env.GEMINI_API_KEY) {
-  throw new Error("GEMINI_API_KEY is missing from the .env file");
+  throw new Error("GEMINI_API_KEY is missing from the environment");
 }
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
+});
+
+console.error("Client environment check:", {
+  PGHOST: process.env.PGHOST || "MISSING",
+  PGPORT: process.env.PGPORT || "MISSING",
+  PGDATABASE: process.env.PGDATABASE || "MISSING",
+  PGUSER: process.env.PGUSER || "MISSING",
+  PGPASSWORD: process.env.PGPASSWORD ? "SET" : "MISSING",
 });
 
 const mcp = new Client({
@@ -22,6 +30,14 @@ const mcp = new Client({
 const transport = new StdioClientTransport({
   command: "npx",
   args: ["tsx", "server.ts"],
+  env: {
+    ...process.env,
+    PGHOST: process.env.PGHOST ?? "",
+    PGPORT: process.env.PGPORT ?? "5432",
+    PGDATABASE: process.env.PGDATABASE ?? "",
+    PGUSER: process.env.PGUSER ?? "",
+    PGPASSWORD: process.env.PGPASSWORD ?? "",
+  },
 });
 
 const app = express();
@@ -61,7 +77,6 @@ async function getFarmers(question: string) {
   };
 }
 
-// Endpoint 1: Get farmer records.
 app.get("/api/farmers", async (_req, res) => {
   try {
     const data = await getFarmers("Return all farmer records");
@@ -72,7 +87,6 @@ app.get("/api/farmers", async (_req, res) => {
   }
 });
 
-// Endpoint 2: Ask Gemini about farmer records.
 app.post("/api/ask", async (req, res) => {
   try {
     const question = req.body?.question;
@@ -82,17 +96,15 @@ app.post("/api/ask", async (req, res) => {
       return;
     }
 
-    // Fetch real data from PostgreSQL through MCP.
     const data = await getFarmers(question);
 
-    // Give Gemini the database results to answer from.
     const response = await ai.models.generateContent({
-     model: "gemini-3.8-flash",
+      model: "gemini-3.8-flash",
       contents: `
 You are an assistant for Sanjivani Sugar Factory.
-Answer the user's question using only the farmer data below.
+Answer using only the farmer data below.
 Do not invent farmer details or amounts.
-If the answer is not available in the data, say so.
+If the answer is unavailable, say so.
 Format your answer clearly.
 
 Farmer data:
@@ -107,9 +119,9 @@ ${question}
       answer: response.text ?? "No answer was generated.",
     });
   } catch (error) {
-    console.error("Gemini API error:", error);
+    console.error("Question API error:", error);
     res.status(500).json({
-      error: "Could not answer the question. Check the backend terminal.",
+      error: "Could not answer the question. Check the backend logs.",
     });
   }
 });
@@ -118,11 +130,11 @@ async function main() {
   await mcp.connect(transport);
   console.log("MCP client connected.");
 
- const port = Number(process.env.PORT) || 3000;
+  const port = Number(process.env.PORT) || 3000;
 
-app.listen(port, "0.0.0.0", () => {
-  console.log(`Backend running on port ${port}`);
-});
+  app.listen(port, "0.0.0.0", () => {
+    console.log(`Backend running on port ${port}`);
+  });
 }
 
 main().catch(error => {
