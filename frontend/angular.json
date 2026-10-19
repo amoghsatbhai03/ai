@@ -1,3 +1,4 @@
+
 {
   "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
   "version": 1,
@@ -31,7 +32,9 @@
             "server": "src/main.server.ts",
             "outputMode": "server",
             "security": {
-              "allowedHosts": []
+              "allowedHosts": [
+                "sanjivani-ai-frontend.onrender.com"
+              ]
             },
             "ssr": {
               "entry": "src/server.ts"
